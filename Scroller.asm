@@ -4,6 +4,8 @@
 ; Displays a cursor in the middle of the screen and 
 ; plots a char at this pos, everytime the stick is moved.
 ;
+; Cursor is frozen in center of playfield.
+;
 ; This prg shows how multi directonal fine scrolling can be done and
 ; how to locate or set a character inside the scrolling area.
 ;
@@ -59,6 +61,7 @@ GRACTL	EQU $D01D
 ; PIA
 
 stick0	equ	$278
+strig0	equ $284
 
 ; Zeropage
 
@@ -130,10 +133,14 @@ endless
 ; Check joystick and scroll playfield accordingly
 ;
 
-pfwidth		equ 255	; x- size of pf in  bytes
-pfheight	equ	255; y- size of pf in bytes	
+pfwidth		equ 100	; x- size of pf in  bytes
+pfheight	equ	100 ; y- size of pf in bytes
+	
 windowx		equ	39	; x- size of screen
 windowy		equ 20	; y- size of screen		
+
+localx		.byte 20; position of the cursor inside window 
+localy		.byte 10
 
 xr	.byte 0			; Save place for our registers
 yr	.byte 0
@@ -163,28 +170,29 @@ scroll
 	; Check Stick
 	;
 	
+	lda strig0
+	bne checkstick
+	jsr pl
+	
+checkstick
 	lda stick0
 	and #8			; Right?
 	bne nr
-	jsr pl
 	jmp movePFLeft
 nr
 	lda stick0
 	and #4			; Left?
 	bne nl
-	jsr pl
 	jmp movePFRight
 nl
 	lda stick0		; Down?
 	and #2
 	bne nd
-	jsr pl
 	jmp movePFUp
 nd
 	lda stick0
 	and #1
 	bne nu
-	jsr pl
 	jmp movePFDown
 nu
 	jmp out			; Leave VBI
@@ -192,8 +200,8 @@ nu
 	; Plotter
 	; Plot something on center of screen.
 pl
-	ldx #20
-	ldy #10
+	ldx localx
+	ldy localy
 	lda #5
 	jsr plot
 	rts
@@ -222,13 +230,7 @@ hardUp
 	sta $d405
 	sta vclocks
 	
-	lda #20 		; We scroll 20 rows of our playfield
-	sta lines
-	lda #<(z0+1)	
-	sta zp			
-	lda #>(z0+1)
-	sta zp+1
-	ldy #0
+	jsr inithardscroll	; Get starting adress of first row of pf from antic programm
 s111				
 	lda (zp),y		
 	clc
@@ -259,12 +261,7 @@ ok2
 	jmp out
 hardDown	
 	dec ycount
-	lda #20 		
-	sta lines
-	lda #<(z0+1)	
-	sta zp			
-	lda #>(z0+1)
-	sta zp+1
+	jsr inithardscroll
 	
 	lda #7
 	sta $d405
@@ -307,14 +304,7 @@ hardleft
 	lda #3			; Reset fine scroll register				
 	sta $d404		; after chracter was moved to it's leftmost position 
 	sta hclocks		
-	
-	lda #20 		; We scroll 20 rows of our playfield
-	sta lines
-	lda #<(z0+1)	; Store adress of ram area where we have saved our adress for screen ram
-	sta zp			; of line 0 of playfield (complicated? :-) Noooooooooo, just bad english :-(
-	lda #>(z0+1)
-	sta zp+1
-	ldy #0
+	jsr inithardscroll
 s1					
 	lda (zp),y		; Get adress of row (Low)
 	clc
@@ -349,14 +339,7 @@ hardright
 	lda #0					
 	sta $d404		
 	sta hclocks		
-	
-	lda #20 		
-	sta lines
-	lda #<(z0+1)	
-	sta zp			
-	lda #>(z0+1)
-	sta zp+1
-	ldy #0
+	jsr inithardscroll
 s11					
 	lda (zp),y		
 	sec
@@ -376,7 +359,21 @@ out
 	ldx xr
 	ldy yr
 	lda a
-	jmp $e45f		
+	jmp $e45f
+	
+;
+; Init hardscroll
+;
+
+inithardscroll
+	lda #20 			; 20 lines of pf are scrolled
+	sta lines
+	ldy #0				
+	lda #<(z0+1)		; Get adress of first line of pf from
+	sta zp				; Antic- programm and store it
+	lda #>(z0+1)		; in zeropage
+	sta zp+1
+	rts					; now do the hardscroll.
 	
 ;
 ; DLI

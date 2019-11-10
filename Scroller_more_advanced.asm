@@ -5,7 +5,7 @@
 ; Does the same as 'Scroller_advanced', but moves not the whole playfield
 ; when the cursor is moved and is is not near of either edge of the playfield.
 ;
-; Plot routine now can also a read char from screen ram (set 'readflag' to a val > 0).
+; Plot routine now can also a read a char from screen ram (set 'readflag' to a val > 0).
 ; When the cursor is moved, char overlapped will be shown in the status line on top of screen.
 ;
 ; This source is a good framework to build a playfield editor or a game engine.
@@ -134,6 +134,7 @@ endless
 ; Check joystick and scroll playfield accordingly
 ;
 
+
 pfwidth		equ 100		; x- size of pf in  bytes
 pfheight	equ	40  	; y- size of pf in bytes
 
@@ -168,7 +169,7 @@ hclocks
 	.byte 0				; Finescroll, number of color clocks the contents of a scanline
 vclocks					; has moved up, down, right or left.
 	.byte 0
-
+	
 	;
 	; Init
 	; 
@@ -176,11 +177,10 @@ scroll
 	stx xr			; Save registers
 	sty yr			
 	sta a	
-	
 	;
 	; Check Stick
 	;
-
+checktrig
 	lda strig0		; Put char on screen?
 	bne checkstick
 	jsr pl
@@ -526,8 +526,6 @@ dli
 	tya
 	pha
 	
-	sta wsync
-	sta wsync
 	lda vcount
 	asl
 	cmp #38
@@ -551,41 +549,37 @@ dli
 	lda #20		; Bright white for the background
 	sta colbaks ; End of screen area for score display
 
-dli1							
+dli1								
 	lda vcount	; Is electron beam at row # bigger than 38?
 	asl			; No? So we are still in area of score display
-	cmp #37		; 
+	cmp #38		; 
 	bcc dlout	; Do nothing!
 
 	;
 	; Set chset for playfield and playfield colors
 	;
 								
-	lda #>chset12 ; Electron beam has crossed row 38 that means
-	sta $d409	; we are in playfild area of our screen
+	lda #>chset12 	; Electron beam has crossed row 38 that means
+	sta $d409		; we are in playfild area of our screen
 
-	lda #193	; Color for bit combination: 10
+	lda #200		; Color for bit combination: 10
 	sta colpf1s									
 	sta wsync
 	
-	lda #250		; Color for bit combination: 11
+	lda #200			; Color for bit combination: 11
 	sta colpf2s
 	sta wsync
 	
-	lda #250	; Color for bit combination: 01	
+	lda #250		; Color for bit combination: 01	
 	sta colpf0s									
 	sta wsync
 
-	; Draw sky
-
-	ldx #0		; Colors Below status
-dd22
-	lda coltap,x
-	beq dlout
+	lda #109		; Color for bit combination=color 5 bit combination 11 (reverse character)
+	sta colpf3s	
+	
+	lda #24
 	sta colbaks
-	sta wsync
-	inx
-	bne dd22			
+	
 dlout
 	pla			; Get registers back
 	tay
@@ -594,6 +588,7 @@ dlout
 	pla
 	
 	rti
+	
 	
 ;
 ; Init PM- Graphics
@@ -644,7 +639,7 @@ c1
 ; Draw cursor
 ;
 
-cursor .byte 0,255,129,129,129,129,129,129,255
+cursor .byte 0,255,129,129,129,129,129,129,255,0
 
 setcursor
 	pha				; Save registers
@@ -652,13 +647,16 @@ setcursor
 	pha
 	tya
 	pha
-
+	
 	ldx #255
 	lda #0
 cl1
 	sta pmadr+512,x
 	dex
 	bne cl1
+
+	ldx #8
+	ldy localyPM
 
 	ldx #8
 	ldy localyPM
@@ -683,7 +681,7 @@ d1
 ; Plot 
 ;
 ; Writes or reads any character you want, at any position into/ from screen ram.
-; If read flag is 0 => plot, otherwise read and return in a- register....
+; If read flag is 0 => plot, otherwise reads a char from ram and returns it in the a- register....
 ;
 ; x-reg	= xpos
 ; y-reg	= ypos
@@ -736,6 +734,8 @@ go
 	
 	rts	
 	
+
+	
 ;	
 ; Antic program for our playfield
 ;
@@ -777,24 +777,15 @@ z17	.byte $40+gr12,a(screen+17*pfwidth)
 z18	.byte $40+gr12,a(screen+18*pfwidth)
 z19	.byte $40+$14,a(screen+19*pfwidth)	; Row 20
 	.byte $41,a(dlgame)				 	; End of display- list, start all over again....
+
+lineAdr
+	.word z0,z1,z2,z3,z4,z5,z6,z7,z8,z9,z10,z11,z12,z13,z14,z15,z16,z17,z18,z19
 	
 scorelin								; Contents of screen ram for status display
 	.byte "  -> Char overlaping                    "
 message
 	.byte "			                               "
 
-
-;
-; Color Tap for DLI
-;
-
-coltap
-
-		.byte 1
-:130	.byte 120		; Blue
-		.byte 1			; Black
-:30		.byte 20		; Brown
-		.byte 0			; End 
 
 ;
 ; Charset data
